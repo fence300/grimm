@@ -1,0 +1,32 @@
+#!/bin/bash
+# Author: Luke Kreft
+
+# a wrapper for error messages
+crit() { echo "Error: $*"; exit;}
+
+# loading necessary files
+[ -e config.sh ] && source config.sh || crit "could not load a config file"
+[ -e functions.sh ] && source functions.sh || crit "could not find functions file"
+
+# safety checks
+[ -e /etc/debian_version ] || [ -e /etc/redhat-release ] || crit "script only supports cent and debian at this time"
+(( $( id -u ) )) && crit "must be run as root"
+
+# getting set up
+[ -d "${dir}" ] || mkdir -p "${dir}"
+[ -d "${dir}" ] || crit "could not create working directory: ${dir}"
+[ -e /etc/debian_version ] && install() { apt-get install -y "$*" 2>"${log_dir}/install.log";}
+[ -e /etc/redhat-release ] && install() { yum install -y "$*" 2>"${log_dir}/install.log";}
+
+# loading the modules
+[ -d "${mod_dir}" ] && find "${mod_dir}" -maxdepth 2 -type f -name main.sh -exec source "{}" \;
+
+# installing dependencies
+if [ -e "${dir}"/dependencies.txt ]
+then
+  for program in $(sed 's|#.*||' "${dir}"/dependencies.txt)
+  do
+    [ $(command -v $program) ] || install $program
+    [ $(command -v $program) ] || crit "could not install needed program: $program"
+  done
+fi
